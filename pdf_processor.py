@@ -3,7 +3,7 @@ import tempfile
 from typing import List, Tuple
 
 import fitz  # PyMuPDF
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class PDFProcessor:

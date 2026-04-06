@@ -3,10 +3,9 @@ from typing import List, Optional
 
 from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.prompts import PromptTemplate
-from langchain.schema import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class RAGPipeline:
@@ -35,28 +34,15 @@ class RAGPipeline:
         )
         self.vectorstore = None
         self.retriever = None
-        self.qa_chain = None
         self.k_retriever = k_retriever
         self.chunks = []
+        self.loaded = False
 
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", ". ", " ", ""],
-        )
-
-        self.prompt_template = PromptTemplate(
-            input_variables=["context", "question"],
-            template=(
-                "You are a helpful assistant for question-answering tasks. "
-                "Use the following pieces of retrieved context to answer the question. "
-                "If you don't know the answer, just say that you don't know. "
-                "Use three sentences maximum and keep the answer concise.\n\n"
-                "Context: {context}\n\n"
-                "Question: {question}\n\n"
-                "Answer:"
-            ),
         )
 
     def load_documents(self, texts: List[str]):
@@ -73,24 +59,32 @@ class RAGPipeline:
             search_type="similarity",
             search_kwargs={"k": self.k_retriever},
         )
-
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.retriever,
-            chain_type_kwargs={"prompt": self.prompt_template},
-            return_source_documents=True,
-        )
+        self.loaded = True
 
     def query(self, question: str) -> dict:
         """Query the RAG pipeline."""
-        if not self.qa_chain:
+        if not self.loaded:
             raise ValueError("No documents loaded. Call load_documents() first.")
 
-        result = self.qa_chain.invoke({"query": question})
+        docs = self.retriever.invoke(question)
+        context = "\n\n".join([doc.page_content for doc in docs])
+
+        prompt = (
+            "You are a helpful assistant for question-answering tasks. "
+            "Use the following pieces of retrieved context to answer the question. "
+            "If you don't know the answer, just say that you don't know. "
+            "Use three sentences maximum and keep the answer concise.\n\n"
+            f"Context: {context}\n\n"
+            f"Question: {question}\n\n"
+            "Answer:"
+        )
+
+        answer = self.llm.invoke(prompt)
+        answer_text = answer if isinstance(answer, str) else answer.content if hasattr(answer, 'content') else str(answer)
+
         return {
-            "answer": result["result"],
-            "source_documents": result.get("source_documents", []),
+            "answer": answer_text,
+            "source_documents": docs,
         }
 
     def get_relevant_chunks(self, question: str) -> List[str]:

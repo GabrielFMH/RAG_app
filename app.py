@@ -46,7 +46,7 @@ class RAGApp:
             raise gr.Error("Please upload a PDF file first.")
 
         if self.rag is None:
-            raise gr.Error("Please initialize with API key first.")
+            raise gr.Error("Please initialize with HF token first.")
 
         with open(pdf_file, "rb") as f:
             pdf_bytes = f.read()
@@ -124,14 +124,6 @@ def create_demo():
                 label="Hugging Face Token",
                 type="password",
                 placeholder="hf_...",
-            )
-            init_btn = gr.Button("Initialize")
-            init_output = gr.Textbox(label="Status", interactive=False)
-
-            init_btn.click(
-                fn=app.initialize,
-                inputs=[hf_token_input],
-                outputs=[init_output],
             )
             init_btn = gr.Button("Initialize")
             init_output = gr.Textbox(label="Status", interactive=False)
