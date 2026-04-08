@@ -14,39 +14,29 @@ class RAGApp:
     """Gradio interface for PDF RAG with evaluation."""
 
     def __init__(self):
-        self.processor = None
-        self.rag = None
-        self.evaluator = None
-        self.full_text = ""
-        self.chunks = []
+        load_dotenv()
+        
         self.hf_token = os.environ.get("HF_TOKEN", "")
-
-    def initialize(self, hf_token: str):
-        """Initialize components with Hugging Face token."""
-        if not hf_token or not hf_token.strip():
-            raise gr.Error("Please provide a valid Hugging Face token.")
-
-        self.hf_token = hf_token.strip()
-        os.environ["HF_TOKEN"] = self.hf_token
-
+        if not self.hf_token:
+            raise ValueError("HF_TOKEN not found in environment. Please set it in .env file.")
+        
         self.processor = PDFProcessor(chunk_size=1000, chunk_overlap=200)
         self.rag = RAGPipeline(
             hf_token=self.hf_token,
-            model_name="mistralai/Mistral-7B-Instruct-v0.3",
+            model_name="meta-llama/Llama-3.1-8B-Instruct",
             embedding_model="sentence-transformers/all-MiniLM-L6-v2",
             k_retriever=4,
         )
         self.evaluator = RAGEvaluator(hf_token=self.hf_token)
-
-        return "Components initialized successfully."
+        
+        self.full_text = ""
+        self.chunks = []
+        self.pdf_loaded = False
 
     def upload_pdf(self, pdf_file):
         """Process uploaded PDF file."""
         if pdf_file is None:
             raise gr.Error("Please upload a PDF file first.")
-
-        if self.rag is None:
-            raise gr.Error("Please initialize with HF token first.")
 
         with open(pdf_file, "rb") as f:
             pdf_bytes = f.read()
@@ -115,24 +105,9 @@ def create_demo():
     """Create the Gradio demo interface."""
     app = RAGApp()
 
-    with gr.Blocks(title="PDF RAG with Evaluation", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="PDF RAG with Evaluation") as demo:
         gr.Markdown("# PDF RAG System with RAGAS Evaluation")
         gr.Markdown("Upload PDFs, ask questions, and evaluate response quality.")
-
-        with gr.Tab("Setup"):
-            hf_token_input = gr.Textbox(
-                label="Hugging Face Token",
-                type="password",
-                placeholder="hf_...",
-            )
-            init_btn = gr.Button("Initialize")
-            init_output = gr.Textbox(label="Status", interactive=False)
-
-            init_btn.click(
-                fn=app.initialize,
-                inputs=[hf_token_input],
-                outputs=[init_output],
-            )
 
         with gr.Tab("Upload PDF"):
             pdf_input = gr.File(label="Upload PDF", file_types=[".pdf"])

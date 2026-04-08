@@ -14,7 +14,7 @@ class RAGPipeline:
     def __init__(
         self,
         hf_token: Optional[str] = None,
-        model_name: str = "mistralai/Mistral-7B-Instruct-v0.3",
+        model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         chunk_size: int = 1000,
         chunk_overlap: int = 200,

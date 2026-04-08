@@ -14,7 +14,7 @@ class RAGEvaluator:
     def __init__(
         self,
         hf_token: Optional[str] = None,
-        model_name: str = "mistralai/Mistral-7B-Instruct-v0.3",
+        model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     ):
         token = hf_token or os.environ.get("HF_TOKEN")
