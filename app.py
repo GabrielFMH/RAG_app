@@ -57,10 +57,10 @@ class RAGApp:
     def ask_question(self, question: str, history):
         """Answer a question using the RAG pipeline."""
         if not question.strip():
-            return history + [(question, "Please enter a question.")], ""
+            return history + [{"role": "user", "content": question}, {"role": "assistant", "content": "Please enter a question."}], ""
 
         if self.rag is None or not self.chunks:
-            return history + [(question, "Please upload and process a PDF first.")], ""
+            return history + [{"role": "user", "content": question}, {"role": "assistant", "content": "Please upload and process a PDF first."}], ""
 
         result = self.rag.query(question)
         answer = result["answer"]
@@ -72,7 +72,8 @@ class RAGApp:
             for i, doc in enumerate(sources, 1):
                 source_info += f"\n{i}. {doc.page_content[:200]}..."
 
-        return history + [(question, answer + source_info)], ""
+        answer_with_sources = answer + source_info
+        return history + [{"role": "user", "content": question}, {"role": "assistant", "content": answer_with_sources}], ""
 
     def run_evaluation(self, questions_text: str):
         """Run RAGAS evaluation."""

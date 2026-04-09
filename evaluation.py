@@ -1,11 +1,62 @@
 import os
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import pandas as pd
 from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
-from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.language_models import LLM
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain_core.outputs import Generation
+from huggingface_hub import InferenceClient
+from pydantic import Field
+
+
+class HuggingFaceChatLLM(LLM):
+    """Custom LLM wrapper for Hugging Face chat completions."""
+    
+    client: Any = Field(default=None, exclude=True)
+    model_name: str = Field(default="meta-llama/Llama-3.1-8B-Instruct")
+    
+    def __init__(self, hf_token: str, model_name: str = "meta-llama/Llama-3.1-8B-Instruct", **kwargs):
+        super().__init__(**kwargs)
+        self.client = InferenceClient(
+            provider="novita",
+            api_key=hf_token,
+        )
+        self.model_name = model_name
+    
+    @property
+    def _llm_type(self) -> str:
+        return "huggingface_chat"
+    
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant. Answer the question concisely."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+        
+        completion = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            max_tokens=500,
+            temperature=0,
+        )
+        
+        return completion.choices[0].message.content
 
 
 class RAGEvaluator:
@@ -21,11 +72,7 @@ class RAGEvaluator:
         if not token:
             raise ValueError("HF_TOKEN not found. Set it as env var or pass it to the constructor.")
 
-        self.llm = HuggingFaceEndpoint(
-            repo_id=model_name,
-            temperature=0,
-            huggingfacehub_api_token=token,
-        )
+        self.llm = HuggingFaceChatLLM(hf_token=token, model_name=model_name)
         self.embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model,
         )

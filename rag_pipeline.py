@@ -1,9 +1,9 @@
 import os
 from typing import List, Optional
 
-from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
+from huggingface_hub import InferenceClient
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -24,13 +24,13 @@ class RAGPipeline:
         if not token:
             raise ValueError("HF_TOKEN not found. Set it as env var or pass it to the constructor.")
 
+        self.model_name = model_name
         self.embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model,
         )
-        self.llm = HuggingFaceEndpoint(
-            repo_id=model_name,
-            temperature=0,
-            huggingfacehub_api_token=token,
+        self.llm_client = InferenceClient(
+            provider="novita",
+            api_key=token,
         )
         self.vectorstore = None
         self.retriever = None
@@ -69,21 +69,28 @@ class RAGPipeline:
         docs = self.retriever.invoke(question)
         context = "\n\n".join([doc.page_content for doc in docs])
 
-        prompt = (
-            "You are a helpful assistant for question-answering tasks. "
-            "Use the following pieces of retrieved context to answer the question. "
-            "If you don't know the answer, just say that you don't know. "
-            "Use three sentences maximum and keep the answer concise.\n\n"
-            f"Context: {context}\n\n"
-            f"Question: {question}\n\n"
-            "Answer:"
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise."
+            },
+            {
+                "role": "user",
+                "content": f"Context: {context}\n\nQuestion: {question}\n\nAnswer:"
+            }
+        ]
+
+        completion = self.llm_client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            max_tokens=500,
+            temperature=0,
         )
 
-        answer = self.llm.invoke(prompt)
-        answer_text = answer if isinstance(answer, str) else answer.content if hasattr(answer, 'content') else str(answer)
+        answer = completion.choices[0].message.content
 
         return {
-            "answer": answer_text,
+            "answer": answer,
             "source_documents": docs,
         }
 
