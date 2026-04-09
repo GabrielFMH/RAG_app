@@ -141,13 +141,33 @@ def create_demo():
                 placeholder="What is the main topic?\nWhat are the key points?\nWhat conclusions are drawn?",
                 value="What is the main topic of this document?\nWhat are the key points discussed?\nWhat conclusions are drawn?",
             )
-            eval_btn = gr.Button("Run Evaluation")
+            with gr.Row():
+                eval_btn = gr.Button("Run Evaluation", variant="primary")
+                eval_loading = gr.Textbox(label="Status", visible=False, interactive=False)
             eval_output = gr.Markdown(label="Results")
 
+            # Function to handle button click with loading state
+            def run_evaluation_with_loading(questions_text):
+                # Show loading state immediately with visual indicator
+                yield (
+                    gr.Textbox(visible=True, value="⏳ Evaluating responses... This may take a moment."),
+                    gr.Button(interactive=False),
+                    gr.Markdown()
+                )
+                # Run the actual evaluation
+                result = app.run_evaluation(questions_text)
+                # Return results with button re-enabled
+                yield (
+                    gr.Textbox(visible=False),
+                    gr.Button(interactive=True),
+                    gr.Markdown(result)
+                )
+
             eval_btn.click(
-                fn=app.run_evaluation,
+                fn=run_evaluation_with_loading,
                 inputs=[questions_input],
-                outputs=[eval_output],
+                outputs=[eval_loading, eval_btn, eval_output],
+                show_progress="full"
             )
 
     return demo
